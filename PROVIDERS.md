@@ -100,3 +100,17 @@ Deploy the commit on the existing Render service after tests pass, configure
 one approved source, and run a movie and TV end-to-end test where licensed.
 Verify resolution, actual content, video/audio decoding, cleanup, and physical
 mobile delivery before exposing production Download for that provider.
+
+## Limit a provider to particular licensed titles
+
+An optional `allowedTitles` array restricts both explicit sourceId and
+source-default requests before browser detection. Use exact references such
+as `["movie:10378"]` for Big Buck Bunny, or `"tv:1399:1:2"` for a specifically
+licensed episode. Empty lists, wildcards and malformed references are rejected.
+Omitting this field preserves existing source behavior; it does not establish
+rights to additional titles.
+
+For host diagnostics, temporarily set `LOG_BLOCKED_SOURCE_HOSTS=1`. The worker
+logs at most 20 distinct blocked hostnames per request with the source ID,
+never full player/media URLs, cookies or credentials. These diagnostics do not
+automatically approve hosts. Remove the setting after troubleshooting.

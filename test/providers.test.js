@@ -67,6 +67,15 @@ test("title resolver selects one approved player and validates the title without
   await assert.rejects(findSource(ref, { ...opts, signal: abort.signal }), { name: "AbortError" });
 });
 
+test("provider licence scope allows only the explicitly approved movie or episode", async () => {
+  const source = loadSources(JSON.stringify({ chosen: { provider: "vidfast", hosts: ["vidfast.vc"], authorization: "test only", allowedTitles: ["movie:10378", "tv:1399:1:2"] } })).get("chosen");
+  assert.match(playerUrl(source, { type: "movie", tmdbId: 10378 }), /10378/);
+  assert.match(playerUrl(source, { type: "tv", tmdbId: 1399, season: 1, episode: 2 }), /1399\/1\/2/);
+  for (const ref of [{ type: "movie", tmdbId: 550 }, { type: "movie" }, { type: "tv", tmdbId: 1399, season: 1, episode: 3 }]) assert.throws(() => playerUrl(source, ref), (e) => e.status === 403);
+  await assert.rejects(findSource({ type: "movie", tmdbId: 550 }, { sources: new Map([["chosen", source]]), defaultSourceId: "chosen" }), (e) => e.status === 403);
+  for (const allowedTitles of [[], "movie:10378", ["movie:*"], ["movie:550/../"], [null]]) assert.throws(() => loadSources(JSON.stringify({ chosen: { provider: "vidfast", hosts: ["vidfast.vc"], authorization: "test only", allowedTitles } })));
+});
+
 test("title resolver refuses direct files and demo players shared by every title", async () => {
   const sources = loadSources(JSON.stringify({
     direct: { url: "https://test.example/movie.mp4", hosts: ["test.example"], authorization: "test only" },
