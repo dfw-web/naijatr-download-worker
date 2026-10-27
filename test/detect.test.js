@@ -93,6 +93,23 @@ test("detects the player's HLS, never reaching a forbidden address", async () =>
   assert.equal(forbiddenHits, 0);
 });
 
+test("title-only requests use the configured player and keep media URLs private", async () => {
+  const withDefault = createApp({ apiKey: "k", sources, jobs, defaultSourceId: "test-player", policyFor: () => policy, detect: (url, o) => detectMedia(url, { ...o, timeoutMs: 15000 }) }).listen(0, "127.0.0.1");
+  await new Promise((r) => withDefault.on("listening", r));
+  const base = `http://127.0.0.1:${withDefault.address().port}`;
+  try {
+    const res = await fetch(base + "/resolve", { method: "POST", headers: auth, body: JSON.stringify({ tmdbId: 550, type: "movie" }) });
+    const body = await res.json();
+    assert.equal(res.status, 200, JSON.stringify(body));
+    assert.equal(body.type, "hls");
+    assert.doesNotMatch(JSON.stringify(body), /127\.0\.0\.1|stream\.m3u8/);
+    const invalid = await fetch(base + "/resolve", { method: "POST", headers: auth, body: JSON.stringify({ tmdbId: 550, type: "invalid" }) });
+    assert.equal(invalid.status, 400);
+  } finally {
+    await new Promise((r) => withDefault.close(r));
+  }
+});
+
 test("a tap-to-play TV player downloads to a playable MP4", async () => {
   const start = await (await post("/download/start", { sourceId: "test-player", type: "tv", tmdbId: "1399", season: 1, episode: 2, filename: "show-s01e02" })).json();
   let st;

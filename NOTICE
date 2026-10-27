@@ -5,6 +5,11 @@ lib/detect.js is adapted from Streambert
 Copyright (C) truelockmc, licensed under the GNU General Public License v3.0.
 The changes are described at the top of lib/detect.js.
 
+lib/providers.js also adapts the player URL templates in Streambert's
+src/utils/api.js at commit 1a4bf7e, Copyright (C) truelockmc, GPL-3.0.
+Changes: server-only templates for TMDB-based sources, explicit approval
+configuration, and no automatic fallback or media-host approval.
+
 Because it includes GPL-3.0 code, this program as a whole is distributed under
 the GNU General Public License v3.0 (see LICENSE). It comes with ABSOLUTELY NO
 WARRANTY, to the extent permitted by law.
