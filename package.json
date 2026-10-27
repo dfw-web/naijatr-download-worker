@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "postinstall": "node scripts/install-chrome.js && node scripts/check-ffmpeg.js",
+    "postinstall": "node scripts/install-chrome.js && node scripts/ffmpeg-diag.js && node scripts/check-ffmpeg.js",
     "test": "node --test",
     "lint": "eslint ."
   },
