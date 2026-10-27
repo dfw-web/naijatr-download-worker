@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "postinstall": "puppeteer browsers install chrome-headless-shell",
+    "postinstall": "puppeteer browsers install chrome-headless-shell && node scripts/check-chrome.js",
     "test": "node --test",
     "lint": "eslint ."
   },
