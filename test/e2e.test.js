@@ -27,7 +27,18 @@ fs.writeFileSync(path.join(fx, "master.m3u8"), [
 ].join("\n"));
 fs.writeFileSync(path.join(fx, "broken.m3u8"), "#EXTM3U\n#EXTINF:1,\nmissing.ts\n#EXT-X-ENDLIST\n");
 
+let flickMediaRequests = 0;
 const source = http.createServer((req, res) => {
+  if (req.url.startsWith("/api/v2/stream-movie?")) {
+    const query = new URL(req.url, "http://fixture").searchParams;
+    assert.equal(query.get("provider"), "own-generated-media");
+    const file = query.get("tmdbId") === "2" ? "clip.mp4" : "master.m3u8";
+    return res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ links: [{ url: `${src}/flick/${file}`, headers: { Cookie: "fixture=1", Referer: "https://fixture.example/player" } }] }));
+  }
+  if (req.url.startsWith("/flick/")) {
+    flickMediaRequests++;
+    if (req.headers.cookie !== "fixture=1" || req.headers.referer !== "https://fixture.example/player") return res.writeHead(403).end();
+  }
   if (req.url === "/redirect-out") return res.writeHead(302, { location: "http://169.254.169.254/latest/meta-data/" }).end();
   if (req.url === "/redirect-in") return res.writeHead(302, { location: "/clip.mp4" }).end();
   const f = path.join(fx, path.basename(req.url));
@@ -45,6 +56,7 @@ const sources = loadSources(JSON.stringify(Object.fromEntries(
   ["master.m3u8", "clip.mp4", "broken.m3u8", "redirect-out", "redirect-in"].map((p) => [p.replace(/\..*/, ""), { url: `${src}/${p}`, hosts: ["127.0.0.1"], authorization: "generated test media", attribution: "test pattern" }]),
 )));
 sources.set("private", loadSources('{"private":{"url":"http://localhost/x.mp4","hosts":["localhost"],"authorization":"t"}}').get("private"));
+sources.set("flick-fixture", loadSources(JSON.stringify({ f: { flick: { provider: "flixquest", apiUrl: src, providerId: "own-generated-media" }, hosts: ["127.0.0.1"], authorization: "Our own API fixture and generated test media" } })).get("f"));
 const jobs = createJobs({ ffmpegPath, tmpRoot });
 // "private" keeps the production policy, to show localhost is refused even when listed.
 const policyFor = (hosts) => (hosts.includes("localhost") ? { allowHost: hostMatcher("localhost"), allowIp: () => false, allowPort: () => true } : policy);
@@ -137,6 +149,23 @@ test("HLS best quality by default", async () => {
 
 test("direct MP4 streams through unchanged", async () => {
   const { out } = await download({ sourceId: "clip" });
+  assert.deepEqual(fs.readFileSync(out), fs.readFileSync(path.join(fx, "clip.mp4")));
+  assert.deepEqual(fs.readdirSync(tmpRoot), []);
+});
+
+test("Flick API -> HLS qualities/audio -> remux -> file preserves required scoped headers", async () => {
+  const { st, out } = await download({ sourceId: "flick-fixture", tmdbId: 10378, type: "movie", quality: 240, filename: "Flick generated fixture" });
+  assert.equal(st.variant.height, 240);
+  assert.deepEqual(st.audioTracks, ["eng"]);
+  const info = probe(out);
+  assert.match(info, /Video: h264.*426x240/);
+  assert.match(info, /Audio: aac/);
+  assert.ok(flickMediaRequests > 4);
+  assert.deepEqual(fs.readdirSync(tmpRoot), []);
+});
+
+test("Flick API -> MP4 -> file streams unchanged with scoped headers", async () => {
+  const { out } = await download({ sourceId: "flick-fixture", tmdbId: 2, type: "movie" });
   assert.deepEqual(fs.readFileSync(out), fs.readFileSync(path.join(fx, "clip.mp4")));
   assert.deepEqual(fs.readdirSync(tmpRoot), []);
 });
