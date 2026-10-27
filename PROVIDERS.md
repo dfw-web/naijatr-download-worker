@@ -114,3 +114,11 @@ For host diagnostics, temporarily set `LOG_BLOCKED_SOURCE_HOSTS=1`. The worker
 logs at most 20 distinct blocked hostnames per request with the source ID,
 never full player/media URLs, cookies or credentials. These diagnostics do not
 automatically approve hosts. Remove the setting after troubleshooting.
+
+With the same diagnostics flag enabled, each completed detection also emits
+`source_detection`: outcome, main-page HTTP status, frame count, failed-request
+count and script-error count. Page text, JS error messages, cookies, headers
+and full URLs are never included. HTTP 4xx/5xx main-page responses fail promptly
+with `player page answered HTTP NNN` rather than waiting for a media timeout.
+These diagnostics identify failures; they do not bypass challenges or change
+host permissions.

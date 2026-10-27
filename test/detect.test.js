@@ -30,6 +30,7 @@ const player = http.createServer((req, res) => {
   // Starts only when tapped.
   if (pathname.startsWith("/embed/tv/")) return res.end(page(`<button style="position:fixed;inset:0" onclick="fetch('/stream.m3u8')">Play</button>`));
   if (pathname === "/empty") return res.end(page("no player here"));
+  if (pathname === "/denied") return res.writeHead(403, { "content-type": "text/html" }).end(page("Access denied"));
   const f = path.join(fx, path.basename(pathname));
   if (!fs.existsSync(f)) return res.writeHead(404).end();
   res.writeHead(200, { "content-type": f.endsWith(".m3u8") ? "application/vnd.apple.mpegurl" : "video/mp2t" });
@@ -131,4 +132,13 @@ test("a page with no media times out cleanly", async () => {
   const res = await post("/resolve", { sourceId: "empty-player" });
   assert.equal(res.status, 404);
   assert.deepEqual(await res.json(), { error: "no media found on the player page" });
+});
+
+test("an HTTP denial is identified before the media timeout without disclosing page data", async () => {
+  const summaries = [];
+  await assert.rejects(detectMedia(origin + "/denied?token=private", { hosts: ["127.0.0.1"], policy, timeoutMs: 5000, onDiagnostic: (summary) => summaries.push(summary) }), (e) => e.status === 502 && e.message === "player page answered HTTP 403");
+  assert.equal(summaries.length, 1);
+  assert.equal(summaries[0].outcome, "http_error");
+  assert.equal(summaries[0].pageStatus, 403);
+  assert.doesNotMatch(JSON.stringify(summaries), /private|127\.0\.0\.1|Access denied/);
 });
