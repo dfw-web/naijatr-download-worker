@@ -8,6 +8,9 @@ import { PUPPETEER_REVISIONS } from "puppeteer-core/internal/revisions.js";
 
 const cacheDir = puppeteer.configuration.cacheDirectory;
 const buildId = PUPPETEER_REVISIONS["chrome-headless-shell"];
+if (process.env.DOWNLOAD_MODE === "flick") {
+  console.log("Flick network mode: Chrome installation is not required");
+} else {
 await install({ browser: Browser.CHROMEHEADLESSSHELL, buildId, cacheDir, platform: detectBrowserPlatform() });
 const exe = puppeteer.executablePath({ headless: "shell" });
 if (!fs.existsSync(exe)) {
@@ -15,3 +18,4 @@ if (!fs.existsSync(exe)) {
   process.exit(1);
 }
 console.log(`chrome-headless-shell ${buildId} installed at ${exe}`);
+}

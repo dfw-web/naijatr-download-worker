@@ -1,5 +1,15 @@
 naijatr-download-worker
 
+lib/flick.js adapts public network-resolution logic from Flickv4's
+src/services/StreamflixService.ts and src/services/FlixQuestService.ts,
+revision 87cb0362842f786bb976dc5c2de1d53b2140e5a5,
+https://github.com/sheeshcake/Flickv4 .
+Copyright (C) 2025 Wendale Franz Dy, GPL-3.0-or-later.
+Changes: Node crypto, guarded requests, scoped headers, validated title IDs,
+and removal of native UI, native downloads, raw URL logs and browser scraping.
+The private scraper backend is not included. Software permission does not
+grant rights to provider media.
+
 lib/detect.js is adapted from Streambert
 (https://github.com/truelockmc/streambert, commit 1a4bf7e),
 Copyright (C) truelockmc, licensed under the GNU General Public License v3.0.
