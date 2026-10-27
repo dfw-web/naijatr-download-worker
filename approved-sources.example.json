@@ -1,0 +1,14 @@
+{
+  "sintel-trailer": {
+    "url": "https://download.blender.org/durian/trailer/sintel_trailer-480p.mp4",
+    "hosts": ["download.blender.org"],
+    "authorization": "Sintel trailer, Blender Foundation; CC BY 3.0. https://durian.blender.org/sharing/",
+    "attribution": "(c) copyright Blender Foundation | durian.blender.org; https://creativecommons.org/licenses/by/3.0/"
+  },
+  "bbb-hls-test": {
+    "url": "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
+    "hosts": ["test-streams.mux.dev"],
+    "authorization": "Big Buck Bunny, Blender Foundation; CC BY 3.0. Mux public HLS test stream.",
+    "attribution": "(c) copyright Blender Foundation | www.bigbuckbunny.org; https://creativecommons.org/licenses/by/3.0/"
+  }
+}

@@ -9,6 +9,7 @@ import ffmpegPath from "ffmpeg-static";
 import { createApp } from "../lib/app.js";
 import { createJobs } from "../lib/jobs.js";
 import { hostMatcher } from "../lib/net.js";
+import { loadSources } from "../lib/sources.js";
 
 // Fixtures: two video-only HLS qualities, a separate audio playlist, a master, and an MP4.
 const fx = fs.mkdtempSync(path.join(os.tmpdir(), "dlw-fx-"));
@@ -40,8 +41,14 @@ const src = `http://127.0.0.1:${source.address().port}`;
 // Tests may reach the local fixture server only; everything else stays blocked.
 const policy = { allowHost: hostMatcher("127.0.0.1"), allowIp: (ip) => ip === "127.0.0.1", allowPort: () => true };
 const tmpRoot = path.join(os.tmpdir(), "dlw-test-jobs");
-const jobs = createJobs({ policy, ffmpegPath, tmpRoot });
-const server = createApp({ apiKey: "k", policy, jobs }).listen(0, "127.0.0.1");
+const sources = loadSources(JSON.stringify(Object.fromEntries(
+  ["master.m3u8", "clip.mp4", "broken.m3u8", "redirect-out", "redirect-in"].map((p) => [p.replace(/\..*/, ""), { url: `${src}/${p}`, hosts: ["127.0.0.1"], authorization: "generated test media", attribution: "test pattern" }]),
+)));
+sources.set("private", loadSources('{"private":{"url":"http://localhost/x.mp4","hosts":["localhost"],"authorization":"t"}}').get("private"));
+const jobs = createJobs({ ffmpegPath, tmpRoot });
+// "private" keeps the production policy, to show localhost is refused even when listed.
+const policyFor = (hosts) => (hosts.includes("localhost") ? { allowHost: hostMatcher("localhost"), allowIp: () => false, allowPort: () => true } : policy);
+const server = createApp({ apiKey: "k", sources, jobs, policyFor }).listen(0, "127.0.0.1");
 await new Promise((r) => server.on("listening", r));
 const api = `http://127.0.0.1:${server.address().port}`;
 const auth = { authorization: "Bearer k", "content-type": "application/json" };
@@ -78,12 +85,12 @@ function probe(file) {
 }
 
 test("requires the API key and the job token", async () => {
-  assert.equal((await post("/resolve", { url: `${src}/clip.mp4` }, { "content-type": "application/json" })).status, 401);
+  assert.equal((await post("/resolve", { sourceId: "clip" }, { "content-type": "application/json" })).status, 401);
   assert.equal((await fetch(`${api}/download/file/nope?token=x`)).status, 404);
 });
 
 test("resolve lists HLS qualities and audio", async () => {
-  const r = await (await post("/resolve", { url: `${src}/master.m3u8` })).json();
+  const r = await (await post("/resolve", { sourceId: "master" })).json();
   assert.equal(r.type, "hls");
   assert.deepEqual(r.variants.map((v) => v.height), [360, 240]);
   assert.equal(r.audio[0].language, "eng");
@@ -95,16 +102,23 @@ test("title lookups fail until a resolver is written", async () => {
   assert.equal((await post("/download/start", { tmdbId: 603, type: "tv", season: 1, episode: 1 })).status, 501);
 });
 
-test("SSRF: blocked hosts, schemes and redirects", async () => {
-  for (const url of ["http://localhost:1/", "file:///etc/passwd", "http://169.254.169.254/", `${src}/redirect-out`]) {
-    const res = await post("/resolve", { url });
-    assert.ok(res.status >= 400 && res.status < 500, `${url} -> ${res.status}`);
+test("callers can't send URLs or unknown sources", async () => {
+  for (const body of [{ url: `${src}/clip.mp4` }, { sourceId: "clip", url: "http://169.254.169.254/" }, { sourceId: "nope" }, { sourceId: "__proto__" }, {}]) {
+    const res = await post("/resolve", body);
+    assert.ok(res.status >= 400 && res.status < 500, `${JSON.stringify(body)} -> ${res.status}`);
   }
-  assert.equal((await (await post("/resolve", { url: `${src}/redirect-in` })).json()).type, "file");
+});
+
+test("SSRF: redirects and private addresses are refused", async () => {
+  for (const sourceId of ["redirect-out", "private"]) assert.equal((await post("/resolve", { sourceId })).status, 400, sourceId);
+  const r = await (await post("/resolve", { sourceId: "redirect-in" })).json();
+  assert.equal(r.type, "file");
+  assert.equal(r.attribution, "test pattern");
+  assert.doesNotMatch(JSON.stringify(r), /127.0.0.1/);
 });
 
 test("HLS master: picks the asked quality, keeps the audio, plays, cleans up", async () => {
-  const { st, out, disposition, start } = await download({ url: `${src}/master.m3u8`, quality: 240, filename: "My Movie" });
+  const { st, out, disposition, start } = await download({ sourceId: "master", quality: 240, filename: "My Movie" });
   assert.equal(st.variant.height, 240);
   assert.deepEqual(st.audioTracks, ["eng"]);
   assert.match(disposition, /My Movie\.mp4/);
@@ -116,19 +130,19 @@ test("HLS master: picks the asked quality, keeps the audio, plays, cleans up", a
 });
 
 test("HLS best quality by default", async () => {
-  const { st, out } = await download({ url: `${src}/master.m3u8` });
+  const { st, out } = await download({ sourceId: "master" });
   assert.equal(st.variant.height, 360);
   assert.match(probe(out), /640x360/);
 });
 
 test("direct MP4 streams through unchanged", async () => {
-  const { out } = await download({ url: `${src}/clip.mp4` });
+  const { out } = await download({ sourceId: "clip" });
   assert.deepEqual(fs.readFileSync(out), fs.readFileSync(path.join(fx, "clip.mp4")));
   assert.deepEqual(fs.readdirSync(tmpRoot), []);
 });
 
 test("failed jobs remove their temp files", async () => {
-  const st = await waitFor(await (await post("/download/start", { url: `${src}/broken.m3u8` })).json());
+  const st = await waitFor(await (await post("/download/start", { sourceId: "broken" })).json());
   assert.equal(st.state, "error");
   assert.deepEqual(fs.readdirSync(tmpRoot), []);
 });

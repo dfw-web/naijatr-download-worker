@@ -1,18 +1,18 @@
 import ffmpegStatic from "ffmpeg-static";
-import { makePolicy } from "./lib/net.js";
+import { loadSources } from "./lib/sources.js";
 import { createJobs } from "./lib/jobs.js";
-import { createApp, DEFAULT_HOSTS } from "./lib/app.js";
+import { createApp } from "./lib/app.js";
 
 const env = process.env;
-const policy = makePolicy(env.ALLOWED_SOURCE_HOSTS || DEFAULT_HOSTS);
+// See approved-sources.example.json.
+const sources = loadSources(env.APPROVED_SOURCES_JSON);
 const jobs = createJobs({
-  policy,
   ffmpegPath: env.FFMPEG_PATH || ffmpegStatic,
   maxJobs: Number(env.MAX_JOBS) || 2,
   maxBytes: (Number(env.MAX_DOWNLOAD_MB) || 3072) * 1024 * 1024,
 });
 const port = env.PORT || 3000;
 
-createApp({ apiKey: env.WORKER_API_KEY, policy, jobs }).listen(port, "0.0.0.0", () => {
-  console.log(`naijatr-download-worker listening on port ${port}`);
+createApp({ apiKey: env.WORKER_API_KEY, sources, jobs }).listen(port, "0.0.0.0", () => {
+  console.log(`naijatr-download-worker listening on port ${port} with ${sources.size} approved source(s)`);
 });
