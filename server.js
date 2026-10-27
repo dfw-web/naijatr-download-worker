@@ -1,17 +1,18 @@
-import express from "express";
+import ffmpegStatic from "ffmpeg-static";
+import { makePolicy } from "./lib/net.js";
+import { createJobs } from "./lib/jobs.js";
+import { createApp, DEFAULT_HOSTS } from "./lib/app.js";
 
-const app = express();
-const port = process.env.PORT || 3000;
-
-app.use(express.json());
-
-app.get("/health", (req, res) => {
-  res.json({
-    status: "ok",
-    service: "naijatr-download-worker"
-  });
+const env = process.env;
+const policy = makePolicy(env.ALLOWED_SOURCE_HOSTS || DEFAULT_HOSTS);
+const jobs = createJobs({
+  policy,
+  ffmpegPath: env.FFMPEG_PATH || ffmpegStatic,
+  maxJobs: Number(env.MAX_JOBS) || 2,
+  maxBytes: (Number(env.MAX_DOWNLOAD_MB) || 3072) * 1024 * 1024,
 });
+const port = env.PORT || 3000;
 
-app.listen(port, "0.0.0.0", () => {
+createApp({ apiKey: env.WORKER_API_KEY, policy, jobs }).listen(port, "0.0.0.0", () => {
   console.log(`naijatr-download-worker listening on port ${port}`);
 });
