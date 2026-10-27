@@ -38,6 +38,14 @@ https://other.example/s2.m4s
   assert.deepEqual(downloads.map((d) => d.url), ["https://h.example/p/key.bin", "https://h.example/p/init.mp4", "https://h.example/p/s1.m4s", "https://other.example/s2.m4s"]);
   assert.match(playlist, /URI="v00000.key",IV=0x01/);
   assert.doesNotMatch(playlist, /https?:/);
+  assert.deepEqual(downloads.map((d) => d.name), ["v00000.key", "v00001.mp4", "v00002.m4s", "v00003.m4s"]);
+});
+
+test("segment names keep a media extension ffmpeg accepts", () => {
+  const names = (media) => localizeMedia(media, "https://h.example/p/x.m3u8", "v").downloads.map((d) => d.name);
+  assert.deepEqual(names("#EXTM3U\n#EXTINF:4,\nseg-1.ts?sig=1\n#EXTINF:4,\nseg-2\n#EXTINF:4,\nseg-3.jpg\n#EXT-X-ENDLIST"), ["v00000.ts", "v00001.ts", "v00002.ts"]);
+  assert.deepEqual(names('#EXTM3U\n#EXT-X-MAP:URI="init"\n#EXTINF:4,\nchunk-1\n#EXT-X-ENDLIST'), ["v00000.m4s", "v00001.m4s"]);
+  assert.throws(() => localizeMedia("#EXTM3U\n#EXT-X-ENDLIST", "https://h/x", "v"), /no segments/);
 });
 
 test("refuses live, SAMPLE-AES and byte-range playlists", () => {
